@@ -724,7 +724,12 @@ window.toggleMusic = function() {
     });
   }
 }
-
+document.addEventListener('click', function() {
+        var music = document.getElementById('bgMusic');
+        if (music.paused) {
+            music.play();
+        }
+    }, { once: true }); // Se ejecuta solo en el primer clic
 // Attempt autoplay on page load
 window.addEventListener('DOMContentLoaded', () => {
   const audio = document.getElementById('bgMusic');
