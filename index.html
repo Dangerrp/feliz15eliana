@@ -629,7 +629,7 @@ footer a {
         <p class="polaroid-caption">15 Inolvidable</p>
       </div>
       <div class="polaroid-card">
-        <video src="https://dl.dropboxusercontent.com/scl/fi/vl0wvsxu46d5wtybybfml/8888e28747a4418a831462303fef2ef4.mp4?rlkey=9062z1o19czn124abpchkrom1" autoplay muted loop playsinline style="width: 100%; height: 400px; object-fit: cover; border-radius: 2px; pointer-events: none;"></video>
+        <video id="polaroidVideo" src="https://dl.dropboxusercontent.com/scl/fi/vl0wvsxu46d5wtybybfml/8888e28747a4418a831462303fef2ef4.mp4?rlkey=9062z1o19czn124abpchkrom1" autoplay muted loop playsinline style="width: 100%; height: 400px; object-fit: cover; border-radius: 2px; pointer-events: none;"></video>
         <p class="polaroid-caption">Con cariño para ti</p>
       </div>
       <div class="polaroid-card">
@@ -1202,6 +1202,23 @@ function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
+// Forzar reproducción del video si cambia el carrusel o se pausa
+const polaroidVideo = document.getElementById('polaroidVideo');
+if (polaroidVideo) {
+  // Intentar reproducir al cargar
+  polaroidVideo.play().catch(e => console.log("Error al reproducir video automático:", e));
+
+  // Función para reanudar el video si el carrusel se desplaza
+  function checkVideoPlayback() {
+    if (polaroidVideo.paused) {
+      polaroidVideo.play().catch(err => {});
+    }
+  }
+
+  // Escuchar cuando cambian las diapositivas del carrusel para reactivar el video
+  setInterval(checkVideoPlayback, 2000);
+    }
+      
 </script>
 </body>
 </html>
