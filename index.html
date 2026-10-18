@@ -1059,12 +1059,228 @@ window.confirmDeleteComment = async function() {
     closePasswordModal();
     if (commentToDeleteId) {
       try {
+// Configuración de Firebase con tus credenciales reales (feliz15eliana)
+const firebaseConfig = {
+  apiKey: "AIzaSyAKMb-6QX5lze45xtnIwnyaTSptByHm0",
+  authDomain: "feliz15eliana.firebaseapp.com",
+  projectId: "feliz15eliana",
+  storageBucket: "feliz15eliana.firebasestorage.app",
+  messagingSenderId: "490352415726",
+  appId: "1:490352415726:web:717242450b705dc5c5b4ff"
+};
+
+let db, auth;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+
+  signInAnonymously(auth).then(() => {
+    setupRealtimeComments();
+  }).catch((err) => {
+    console.error("Auth anon error:", err);
+    setupRealtimeComments();
+  });
+} catch (e) {
+  console.error("Firebase init error:", e);
+}
+
+let commentsData = [];
+let commentIndex = 0;
+let commentInterval = null;
+let isPaused = false;
+let commentToDeleteId = null;
+
+function setupRealtimeComments() {
+  try {
+    const commentsRef = collection(db, 'guestbook_comments');
+    const q = query(commentsRef, orderBy('timestamp', 'desc'));
+
+    onSnapshot(q, (snapshot) => {
+      const loadedComments = [];
+      snapshot.forEach((docSnap) => {
+        loadedComments.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      commentsData = loadedComments;
+      renderCommentsCarousel();
+      startCommentAutoSlide();
+    }, (error) => {
+      console.error("Firestore snapshot error:", error);
+      const trackEl = document.getElementById('commentsTrack');
+      trackEl.innerHTML = `
+        <div class="comment-slide">
+          <div class="comment-author">Aviso de Configuración</div>
+          <p class="comment-text">Por favor recuerda activar Firestore Database en modo de prueba en tu consola de Firebase.</p>
+          <div class="comment-footer-row"><span class="comment-date">Sistema</span></div>
+        </div>
+      `;
+    });
+  } catch (e) {
+    console.error("Error setting up comments:", e);
+  }
+}
+
+function renderCommentsCarousel() {
+  const trackEl = document.getElementById('commentsTrack');
+  const dotsEl = document.getElementById('commentDots');
+  
+  trackEl.innerHTML = '';
+  dotsEl.innerHTML = '';
+
+  if (commentsData.length === 0) {
+    trackEl.innerHTML = `
+      <div class="comment-slide">
+        <div class="comment-author">Aún no hay mensajes</div>
+        <p class="comment-text">Sé el primero en dejar tu mensaje o felicitación para Eliana usando el formulario de arriba.</p>
+        <div class="comment-footer-row"><span class="comment-date">Libro de visitas</span></div>
+      </div>
+    `;
+    return;
+  }
+
+  commentsData.forEach((c, idx) => {
+    const slide = document.createElement('div');
+    slide.className = 'comment-slide';
+    // Se usa codificación segura y se asegura de pasar el id correctamente
+    slide.innerHTML = `
+      <div class="comment-author">${escapeHtml(c.name || '')}</div>
+      <p class="comment-text">${escapeHtml(c.text || '')}</p>
+      <div class="comment-footer-row">
+        <span class="comment-date">${c.timestamp ? new Date(c.timestamp).toLocaleDateString() : ''}</span>
+        <button type="button" class="delete-comment-btn" onclick="openPasswordModal(event, '${c.id}')">Eliminar</button>
+      </div>
+    `;
+    trackEl.appendChild(slide);
+
+    const dot = document.createElement('div');
+    dot.className = `carousel-dot ${idx === commentIndex ? 'active' : ''}`;
+    dot.onclick = (e) => {
+      e.stopPropagation();
+      commentIndex = idx;
+      updateCarouselPosition();
+      resetCommentAutoSlide();
+    };
+    dotsEl.appendChild(dot);
+  });
+
+  updateCarouselPosition();
+}
+
+function updateCarouselPosition() {
+  const trackEl = document.getElementById('commentsTrack');
+  const dots = document.querySelectorAll('.carousel-dot');
+  
+  if (commentsData.length === 0) return;
+  if (commentIndex >= commentsData.length) commentIndex = 0;
+  if (commentIndex < 0) commentIndex = commentsData.length - 1;
+
+  trackEl.style.transform = `translateX(-${commentIndex * 100}%)`;
+
+  dots.forEach((dot, idx) => {
+    if (idx === commentIndex) {
+      dot.classList.add('active');
+    } else {
+      dot.classList.remove('active');
+    }
+  });
+}
+
+function startCommentAutoSlide() {
+  if (commentInterval) clearInterval(commentInterval);
+  commentInterval = setInterval(() => {
+    if (!isPaused && commentsData.length > 1) {
+      commentIndex = (commentIndex + 1) % commentsData.length;
+      updateCarouselPosition();
+    }
+  }, 4500);
+}
+
+function resetCommentAutoSlide() {
+  startCommentAutoSlide();
+}
+
+const carouselContainer = document.getElementById('commentsCarousel');
+
+carouselContainer.addEventListener('click', () => {
+  isPaused = !isPaused;
+});
+
+let touchStartX = 0;
+let touchEndX = 0;
+
+carouselContainer.addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+  isPaused = true;
+}, {passive: true});
+
+carouselContainer.addEventListener('touchend', (e) => {
+  touchEndX = e.changedTouches[0].screenX;
+  handleSwipe();
+}, {passive: true});
+
+function handleSwipe() {
+  if (commentsData.length <= 1) return;
+  if (touchEndX < touchStartX - 40) {
+    commentIndex = (commentIndex + 1) % commentsData.length;
+    updateCarouselPosition();
+  }
+  if (touchEndX > touchStartX + 40) {
+    commentIndex = (commentIndex - 1 + commentsData.length) % commentsData.length;
+    updateCarouselPosition();
+  }
+}
+
+window.handleCommentSubmit = async function(event) {
+  event.preventDefault();
+  const nameInput = document.getElementById('commentName');
+  const textInput = document.getElementById('commentText');
+
+  const newComment = {
+    name: nameInput.value.trim(),
+    text: textInput.value.trim(),
+    timestamp: Date.now()
+  };
+
+  try {
+    const commentsRef = collection(db, 'guestbook_comments');
+    await addDoc(commentsRef, newComment);
+    nameInput.value = '';
+    textInput.value = '';
+    alertCustom("¡Mensaje enviado con éxito!", "#28a745");
+  } catch (e) {
+    console.error("Error adding document: ", e);
+    alertCustom("Error al enviar el comentario. Verifica tus reglas de Firestore.");
+  }
+}
+
+window.openPasswordModal = function(e, commentId) {
+  e.stopPropagation();
+  commentToDeleteId = commentId;
+  document.getElementById('deletePasswordInput').value = '';
+  document.getElementById('passwordModal').classList.add('active');
+}
+
+window.closePasswordModal = function() {
+  document.getElementById('passwordModal').classList.remove('active');
+  commentToDeleteId = null;
+}
+
+window.confirmDeleteComment = async function() {
+  const pwd = document.getElementById('deletePasswordInput').value;
+  if (pwd === 'Eliana') {
+    if (commentToDeleteId) {
+      try {
         await deleteDoc(doc(db, 'guestbook_comments', commentToDeleteId));
+        closePasswordModal();
         alertCustom("Comentario eliminado correctamente.", "#28a745");
       } catch (err) {
         console.error("Error deleting document:", err);
-        alertCustom("Error al eliminar el comentario.");
+        alertCustom("Error al eliminar de Firestore: " + err.message);
       }
+    } else {
+      closePasswordModal();
+      alertCustom("Error: No se encontró el ID del comentario.");
     }
   } else {
     alertCustom("Contraseña incorrecta. La contraseña es 'Eliana'.");
@@ -1072,17 +1288,23 @@ window.confirmDeleteComment = async function() {
 }
 
 function alertCustom(msg, bg = "#cc3333") {
+  const existing = document.getElementById('customAlertBox');
+  if (existing) existing.remove();
+
   const box = document.createElement('div');
-  box.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:12px 20px;border-radius:6px;z-index:9999;font-weight:bold;box-shadow: 0 4px 12px rgba(0,0,0,0.5);`;
+  box.id = 'customAlertBox';
+  box.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:12px 20px;border-radius:6px;z-index:99999;font-weight:bold;box-shadow: 0 4px 12px rgba(0,0,0,0.5);text-align:center;max-width:90%;word-break:break-word;`;
   box.innerText = msg;
   document.body.appendChild(box);
-  setTimeout(() => box.remove(), 3000);
+  setTimeout(() => {
+    if (box) box.remove();
+  }, 4000);
 }
 
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
+  }
 </script>
 </body>
 </html>
