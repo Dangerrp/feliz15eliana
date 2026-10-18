@@ -724,7 +724,7 @@ window.toggleMusic = function() {
     });
   }
 }
-document.addEventListener('scroll', function() {
+document.addEventListener('touchstart', function() {
         var music = document.getElementById('bgMusic');
         if (music.paused) {
             music.play();
